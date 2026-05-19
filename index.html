@@ -552,25 +552,93 @@
     document.getElementById('phrase').textContent = '¡Lo has conseguido! Ahora a disfrutar (y a no mirar el correo).';
   }
 
-  // ── SPOTIFY + Claude API ────────────────────────────────────────────
-  async function fetchPlaylists(frase) {
-    const prompt = 'Eres un experto en música y motivación. Dada esta frase motivadora:\n"' + frase + '"\n\nPropón exactamente 4 playlists de Spotify que encajen con el estado de ánimo y energía de esa frase.\n\nResponde ÚNICAMENTE con un array JSON válido, sin texto adicional, sin markdown, sin backticks. Formato exacto:\n[\n  {\n    "emoji": "🔥",\n    "name": "Nombre de la playlist",\n    "desc": "Frase corta (máx 60 chars) que describa el vibe",\n    "query": "termino de busqueda en spotify"\n  }\n]\n\nReglas:\n- emoji: uno solo, representativo del mood\n- name: nombre descriptivo de la playlist (máx 40 chars)\n- desc: descripción breve y motivadora en español\n- query: búsqueda en inglés o español para Spotify\n- Varía los géneros: mezcla upbeat, focus, chill y energía según la frase\n- No uses comillas dobles dentro de los strings';
+  // ── SPOTIFY SIN API ────────────────────────────────────────────────
+  // No se usa ninguna API, token ni backend. Cada tarjeta abre una búsqueda
+  // pública en Spotify Web con términos relacionados con la frase del día.
+  const playlistMoods = [
+    {
+      keywords: ['café', 'lunes', 'despertador', 'sueño', 'ojeras'],
+      playlists: [
+        { emoji: '☕', name: 'Café y energía suave', desc: 'Para arrancar sin prisa, pero arrancar.', query: 'morning coffee motivation playlist' },
+        { emoji: '🌤️', name: 'Buenos días con ritmo', desc: 'Pop luminoso para activar el ánimo.', query: 'good morning upbeat pop playlist' },
+        { emoji: '🎧', name: 'Modo concentración amable', desc: 'Base tranquila para entrar en tarea.', query: 'lofi focus morning playlist' },
+        { emoji: '⚡', name: 'Subidón de primera hora', desc: 'Energía rápida cuando cuesta empezar.', query: 'wake up energy playlist' }
+      ]
+    },
+    {
+      keywords: ['avanzar', 'progreso', 'paso', 'empezar', 'constante', 'gotas', 'tortuga', 'cinco minutos'],
+      playlists: [
+        { emoji: '🚶', name: 'Paso a paso', desc: 'Canciones para mantener el ritmo.', query: 'keep going motivational playlist' },
+        { emoji: '🎯', name: 'Focus de avance', desc: 'Música para trabajar con claridad.', query: 'deep focus productivity playlist' },
+        { emoji: '🌱', name: 'Pequeñas victorias', desc: 'Vibra positiva para celebrar avances.', query: 'small wins feel good playlist' },
+        { emoji: '🔥', name: 'Sin parar', desc: 'Impulso extra para seguir un poco más.', query: 'motivational workout pop playlist' }
+      ]
+    },
+    {
+      keywords: ['brillar', 'actitud', 'positivo', 'sueños', 'éxito', 'futuro', 'puedes', 'confía'],
+      playlists: [
+        { emoji: '✨', name: 'Hoy toca brillar', desc: 'Temas alegres para subir la confianza.', query: 'confidence boost playlist' },
+        { emoji: '🏆', name: 'Mentalidad ganadora', desc: 'Motivación épica sin perder elegancia.', query: 'winner mindset playlist' },
+        { emoji: '🌈', name: 'Buen rollo total', desc: 'Pop feel-good para cambiar el día.', query: 'feel good pop hits playlist' },
+        { emoji: '💪', name: 'Tú puedes', desc: 'Energía directa para creértelo.', query: 'you got this motivational playlist' }
+      ]
+    },
+    {
+      keywords: ['organiza', 'documento', 'archivos', 'contraseña', 'pestaña', 'portátil', 'correo', 'reuniones'],
+      playlists: [
+        { emoji: '💻', name: 'Productividad elegante', desc: 'Para ordenar ideas y tareas.', query: 'productive work music playlist' },
+        { emoji: '🧠', name: 'Cerebro en marcha', desc: 'Instrumental para pensar con foco.', query: 'instrumental coding focus playlist' },
+        { emoji: '📁', name: 'Orden mental', desc: 'Sonido limpio para reducir el caos.', query: 'minimal electronic focus playlist' },
+        { emoji: '📝', name: 'Guardar y seguir', desc: 'Ritmo suave para cerrar pendientes.', query: 'study chill focus playlist' }
+      ]
+    },
+    {
+      keywords: ['plan A', 'improvisa', 'raro', 'anécdota', 'disimular', 'miedo', 'dudas', 'chanclas'],
+      playlists: [
+        { emoji: '🎲', name: 'Improvisa con estilo', desc: 'Música para fluir con lo inesperado.', query: 'indie feel good playlist' },
+        { emoji: '😎', name: 'Caos con flow', desc: 'Ritmos ligeros para relativizar.', query: 'funky upbeat playlist' },
+        { emoji: '🚀', name: 'Hazlo igual', desc: 'Energía para actuar aunque haya dudas.', query: 'no fear motivational playlist' },
+        { emoji: '🎸', name: 'Día raro, buena música', desc: 'Indie y pop para convertirlo en anécdota.', query: 'quirky indie pop playlist' }
+      ]
+    },
+    {
+      keywords: ['siesta', 'procrastinando', 'creatividad', 'pijama', 'disciplina', 'ganas', 'música'],
+      playlists: [
+        { emoji: '🛋️', name: 'Creatividad cargando', desc: 'Chill para desbloquear ideas.', query: 'creative chill playlist' },
+        { emoji: '🎨', name: 'Ideas en movimiento', desc: 'Sonidos para pensar distinto.', query: 'creative flow playlist' },
+        { emoji: '🌙', name: 'Baja intensidad', desc: 'Para avanzar sin quemarte.', query: 'soft focus chill playlist' },
+        { emoji: '🎶', name: 'Ponle música', desc: 'Cuando faltan ganas, entra el ritmo.', query: 'mood booster playlist' }
+      ]
+    }
+  ];
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
+  const defaultPlaylists = [
+    { emoji: '🌟', name: 'Motivación diaria', desc: 'Un empujón musical para el día.', query: 'daily motivation playlist' },
+    { emoji: '🎧', name: 'Focus tranquilo', desc: 'Para concentrarse sin ruido mental.', query: 'focus chill playlist' },
+    { emoji: '🔥', name: 'Energía positiva', desc: 'Ritmo para subir el ánimo.', query: 'positive energy playlist' },
+    { emoji: '☀️', name: 'Buen día', desc: 'Canciones luminosas para acompañarte.', query: 'good vibes playlist' }
+  ];
+
+  function normalizeText(text) {
+    return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function getPlaylistsForPhrase(text) {
+    const cleanText = normalizeText(text);
+    let bestMood = null;
+    let bestScore = 0;
+
+    playlistMoods.forEach(function(mood) {
+      const score = mood.keywords.reduce(function(total, keyword) {
+        return total + (cleanText.indexOf(normalizeText(keyword)) !== -1 ? 1 : 0);
+      }, 0);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMood = mood;
+      }
     });
 
-    if (!response.ok) throw new Error('API error ' + response.status);
-    const data = await response.json();
-    const text = data.content.map(function(i) { return i.text || ''; }).join('');
-    const clean = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean);
+    return bestMood ? bestMood.playlists : defaultPlaylists;
   }
 
   function spotifyIcon() {
@@ -604,20 +672,13 @@
     container.appendChild(grid);
   }
 
-  function renderError() {
-    document.getElementById('playlistsContainer').innerHTML =
-      '<div class="error-state">' +
-        '<p>No se pudieron cargar las sugerencias musicales.</p>' +
-        '<button class="retry-btn" onclick="loadPlaylists()">↺ Reintentar</button>' +
-      '</div>';
-  }
-
   function loadPlaylists() {
     document.getElementById('playlistsContainer').innerHTML =
-      '<div class="loading-state"><div class="loader"></div><span>Buscando la banda sonora perfecta…</span></div>';
-    fetchPlaylists(frase)
-      .then(renderPlaylists)
-      .catch(function(e) { console.error(e); renderError(); });
+      '<div class="loading-state"><div class="loader"></div><span>Preparando la banda sonora del día…</span></div>';
+
+    setTimeout(function() {
+      renderPlaylists(getPlaylistsForPhrase(frase));
+    }, 500);
   }
 
   setTimeout(loadPlaylists, 1200);
